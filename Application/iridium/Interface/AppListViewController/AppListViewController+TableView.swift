@@ -48,6 +48,8 @@ extension AppListViewController: UITableViewDelegate, UITableViewDataSource {
                                     if index == 0 {
                                         self.dispatchDecrypt(app: data)
                                     } else if index == 1 {
+                                        self.promptDecryptPrep(app: data)
+                                    } else if index == 2 {
                                         data.bundleURL.openInFilza()
                                     } else {
                                         debugPrint("invalid/canceled action")
@@ -56,6 +58,7 @@ extension AppListViewController: UITableViewDelegate, UITableViewDataSource {
                                 dataSource:
                                 [
                                     "Decrypt Now",
+                                    "Decrypt Prep",
                                     "Filza Open Bundle",
                                     "Cancel",
                                 ]
@@ -68,13 +71,29 @@ extension AppListViewController: UITableViewDelegate, UITableViewDataSource {
         }
     }
 
-    func dispatchDecrypt(app: AppListElement) {
+    func dispatchDecrypt(app: AppListElement, minOSVersionOverride: String? = nil) {
         let controller = DecrypterViewController()
         controller.app = app
+        controller.minOSVersionOverride = minOSVersionOverride
         controller.modalTransitionStyle = .coverVertical
         controller.modalPresentationStyle = .formSheet
         controller.isModalInPresentation = true
         controller.preferredContentSize = CGSize(width: 700, height: 555)
         present(controller, animated: true, completion: nil)
+    }
+
+    func promptDecryptPrep(app: AppListElement) {
+        let alert = UIAlertController(title: "Decrypt Prep", message: "输入目标 MinimumOSVersion (例如: 14.0):", preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.placeholder = "14.0"
+            textField.keyboardType = .numbersAndPunctuation
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+        alert.addAction(UIAlertAction(title: "Proceed", style: .default, handler: { _ in
+            if let version = alert.textFields?.first?.text, !version.isEmpty {
+                self.dispatchDecrypt(app: app, minOSVersionOverride: version)
+            }
+        }))
+        self.present(alert, animated: true, completion: nil)
     }
 }
