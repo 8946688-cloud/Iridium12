@@ -83,7 +83,7 @@ extension AppListViewController: UITableViewDelegate, UITableViewDataSource {
     }
 
     func promptDecryptPrep(app: AppListElement) {
-        let alert = UIAlertController(title: "Decrypt Prep", message: "输入目标 MinimumOSVersion (例如: 14.0):", preferredStyle: .alert)
+        let alert = UIAlertController(title: "Decrypt Prep", message: " MinimumOSVersion :", preferredStyle: .alert)
         alert.addTextField { textField in
             textField.placeholder = "14.0"
             textField.keyboardType = .numbersAndPunctuation
