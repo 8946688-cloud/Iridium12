@@ -104,6 +104,17 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             view.addTarget(self, action: #selector(selectCompressionLevel), for: .touchUpInside)
         case 6:
             let view = makeLeftAligButton()
+            view.setTitle("Expand Signature Space", for: .normal)
+            cell.contentView.addSubview(view)
+            view.snp.makeConstraints { x in
+                x.left.equalToSuperview().offset(padding)
+                x.top.equalToSuperview()
+                x.bottom.equalToSuperview()
+                x.width.equalTo(250)
+            }
+            view.addTarget(self, action: #selector(selectExpandSignature), for: .touchUpInside)
+        case 7:
+            let view = makeLeftAligButton()
             view.setTitle("Clear Documents", for: .normal)
             cell.contentView.addSubview(view)
             view.snp.makeConstraints { x in
@@ -113,7 +124,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(clearDocuments), for: .touchUpInside)
-        case 7:
+        case 8:
             let view = makeTintTextView()
             view.text = """
             Iridium is powered by FoulDecrypt.
@@ -132,7 +143,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                         right: CGFloat(padding)
                     ))
             }
-        case 8:
+        case 9:
             let view = makeLeftAligButton()
             view.setTitle("Get Source: [Iridium]", for: .normal)
             cell.contentView.addSubview(view)
@@ -143,7 +154,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(openSourceIridium), for: .touchUpInside)
-        case 9:
+        case 10:
             let view = makeLeftAligButton()
             view.setTitle("Get Source: [FoulDecrypt]", for: .normal)
             cell.contentView.addSubview(view)
@@ -154,7 +165,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(openSourceFoul), for: .touchUpInside)
-        case 10:
+        case 11:
             let view = makeTintTextView()
             view.text = """
             Copyright © 2022 Lakr Aream All Rights Reserved
@@ -169,7 +180,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                         right: CGFloat(padding)
                     ))
             }
-        case 11:
+        case 12:
             let view = makeLeftAligButton()
             view.setTitle("Twitter: @Lakr233", for: .normal)
             cell.contentView.addSubview(view)
@@ -214,15 +225,15 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             return 40
         case 2:
             return 30
-        case 3, 4, 5, 6: // button
+        case 3, 4, 5, 6, 7: // button
             return 25
-        case 7: // text
+        case 8: // text
             return 115
-        case 8, 9: // button
+        case 9, 10: // button
             return 25
-        case 10:
-            return 30
         case 11:
+            return 30
+        case 12:
             return 25
         default:
             return 0
@@ -307,6 +318,31 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             }),
             .init(text: currentLevel == 9 ? "✓ Best (Level 9)" : "Best (Level 9)", action: { _ in
                 Agent.shared.zipCompressionLevel = 9
+            }),
+            .init(text: "Cancel", action: { _ in })
+        ]
+        
+        let dropDown = DropDown(anchorView: sender)
+        dropDown.dataSource = actions
+            .map(\.text)
+            .invisibleSpacePadding()
+        dropDown.selectionAction = { [self] (index: Int, _: String) in
+            guard index >= 0, index < actions.count else { return }
+            let action = actions[index]
+            action.action(self)
+        }
+        dropDown.show(onTopOf: view.window)
+    }
+
+    @objc func selectExpandSignature(sender: UIButton) {
+        let expand = Agent.shared.expandSignature
+        
+        let actions: [SelectAction] = [
+            .init(text: !expand ? "✓ Original Size (Default)" : "Original Size (Default)", action: { _ in
+                Agent.shared.expandSignature = false
+            }),
+            .init(text: expand ? "✓ Expanded (For Old Devices)" : "Expanded (For Old Devices)", action: { _ in
+                Agent.shared.expandSignature = true
             }),
             .init(text: "Cancel", action: { _ in })
         ]
