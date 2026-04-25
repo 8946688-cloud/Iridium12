@@ -51,7 +51,7 @@ class Agent {
         }
     }
 
-    // [新增] 压缩等级持久化存储，默认为0
+    // 压缩等级持久化存储，默认为0
     var zipCompressionLevel: Int {
         get {
             if UserDefaults.standard.object(forKey: "wiki.qaq.iridium.compressionLevel") == nil {
@@ -65,7 +65,7 @@ class Agent {
         }
     }
 
-    // [新增] 扩容签名区持久化存储，默认为 false
+    // 扩容签名区持久化存储，默认为 false
     var expandSignature: Bool {
         get {
             return UserDefaults.standard.bool(forKey: "wiki.qaq.iridium.expandSignature")
@@ -240,24 +240,18 @@ class Agent {
             let infoPlistURL = processBundleLocation.appendingPathComponent("Info.plist")
             
             do {
-                // 1. 读取原始 Plist 数据 (由于 App 文件可读，即使 Owner 是 Root 也能读)
                 let plistData = try Data(contentsOf: infoPlistURL)
                 var format: PropertyListSerialization.PropertyListFormat = .binary
                 
-                // 2. 转换为 Dictionary
                 if var plistDict = try PropertyListSerialization.propertyList(from: plistData, options: .mutableContainersAndLeaves, format: &format) as? [String: Any] {
                     
-                    // 3. 修改目标版本值
                     plistDict["MinimumOSVersion"] = targetVersion
                     
-                    // 4. 重新序列化为原有格式（通常是 iOS 标准的二进制 Binary 格式）
                     let newData = try PropertyListSerialization.data(fromPropertyList: plistDict, format: format, options: 0)
                     
-                    // 5. 写入到当前 App 可写的沙盒临时文件中
                     let tempPlistURL = documentsDirectory.appendingPathComponent("Temp_Info.plist")
                     try newData.write(to: tempPlistURL)
                     
-                    // 6. 借助 Agent (Root 权限) 删除旧文件，并将新文件拷贝进去
                     let _ = AuxiliaryExecute.spawn(
                         command: binaryLocation.path,
                         args: ["delete", infoPlistURL.path],
@@ -270,7 +264,6 @@ class Agent {
                         timeout: 60
                     )
                     
-                    // 7. 清理临时文件
                     try? FileManager.default.removeItem(at: tempPlistURL)
                     
                     output("\n[*] MinimumOSVersion patched successfully to \(targetVersion).\n")
@@ -287,7 +280,7 @@ class Agent {
 
         output("\nSearching for mach objects...\n")
 
-        var binaries = [(URL, URL)]() // the orig binary is at .0 and we decrypt it to .1
+        var binaries = [(URL, URL)]() 
         repeat {
             let enumerator = FileManager
                 .default
@@ -296,10 +289,8 @@ class Agent {
                 guard let objectPath = enumerator?
                     .nextObject() as? String
                 else {
-                    // nothing left from the enumerator
                     break
                 }
-                // data might be large
                 autoreleasepool {
                     let currentObjectFullPath = processBundleLocation
                         .appendingPathComponent(objectPath)
@@ -308,7 +299,6 @@ class Agent {
                     }
                                   let magic = data.magic
                     
-                    // 补齐所有 Mach-O (32位/64位) 和 Fat Binary 的大端和小端序 Magic Number
                     if magic == MH_MAGIC_64 || magic == MH_CIGAM_64 ||
                        magic == FAT_MAGIC_64 || magic == FAT_CIGAM_64 ||
                        magic == MH_MAGIC || magic == MH_CIGAM ||
@@ -344,7 +334,6 @@ class Agent {
                 ],
                 timeout: 60
             )
-            // no longer output them, too noising on normal return
             output("\n[*] Recipe: \(recipe.exitCode)\n")
             if recipe.exitCode != 0 || recipe.error != nil {
                 possibleFailure = true
@@ -359,11 +348,10 @@ class Agent {
         }
 
         // =====================================================================
-        // [新增] MARK: - STEP 3.2 - 扩容签名空间
+        // [修改] MARK: - STEP 3.2 - 扩容签名空间（采用 5MB 垃圾占位法）
         if expandSignature {
-            output("\n\n[*] Expanding signature space for old devices...\n")
+            output("\n\n[*] Expanding signature space with 5MB padding...\n")
             
-            // 自动寻找 ldid 的路径 (包括 TrollStore 和常见越狱目录)
             var ldidPath = ""
             var searchPaths = [
                 "/var/jb/usr/bin/ldid",
@@ -391,12 +379,29 @@ class Agent {
             if ldidPath.isEmpty {
                 output("[!] ldid not found! Cannot expand signature space.\n")
             } else {
+                // 核心：生成一个包含 5MB 垃圾字符串的假权限文件，强迫 ldid 在文件中撑开一个巨大的坑位
+                output("[*] Generating 5MB padding dummy entitlements...\n")
+                let dummyString = String(repeating: "A", count: 1024 * 1024 * 5)
+                let plistString = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+                <plist version="1.0">
+                <dict>
+                    <key>IridiumPadding</key>
+                    <string>\(dummyString)</string>
+                </dict>
+                </plist>
+                """
+                let paddingPlistURL = documentsDirectory.appendingPathComponent("IridiumPadding.plist")
+                try? plistString.write(to: paddingPlistURL, atomically: true, encoding: .utf8)
+                
                 for (_, destBinary) in binaries {
-                    output("[*] Resigning to expand signature: \(destBinary.lastPathComponent)\n")
+                    output("[*] Resigning to pad signature: \(destBinary.lastPathComponent)\n")
+                    // 使用 -S 参数和刚才生成的垃圾权限文件，强行扩容
                     let recipe = AuxiliaryExecute.spawn(
                         command: binaryLocation.path,
-                        args: ["exec", ldidPath, "-s", destBinary.path],
-                        timeout: 120
+                        args: ["exec", ldidPath, "-S\(paddingPlistURL.path)", destBinary.path],
+                        timeout: 300 // 防止因为 800MB 计算哈希太慢而超时，给 5 分钟
                     )
                     if recipe.exitCode != 0 {
                         output("[!] Failed:\n\(recipe.stderr)\n")
@@ -404,6 +409,9 @@ class Agent {
                         output("    Success.\n")
                     }
                 }
+                
+                // 清理临时垃圾文件
+                try? FileManager.default.removeItem(at: paddingPlistURL)
             }
         }
         // =====================================================================
@@ -467,7 +475,7 @@ class Agent {
         var currentProgress = [String]()
         output("\n\n[*] Creating archive at \(zipTarget.path)\n\n")
 
-        let requiredDot = 25 // 4 percent each lol
+        let requiredDot = 25 
         output(
             [String](repeating: ".", count: requiredDot)
                 .joined(separator: "")
@@ -477,7 +485,7 @@ class Agent {
             atPath: zipTarget.path,
             withContentsOfDirectory: zipContainer.path,
             keepParentDirectory: false,
-            compressionLevel: Int32(zipCompressionLevel), // [修改] 应用设置里的压缩等级
+            compressionLevel: Int32(zipCompressionLevel),
             password: nil,
             aes: false
         ) { entryNumber, total in
