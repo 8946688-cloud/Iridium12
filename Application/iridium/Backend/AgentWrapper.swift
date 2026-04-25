@@ -51,6 +51,20 @@ class Agent {
         }
     }
 
+    // [新增] 压缩等级持久化存储，默认为0
+    var zipCompressionLevel: Int {
+        get {
+            if UserDefaults.standard.object(forKey: "wiki.qaq.iridium.compressionLevel") == nil {
+                return 0 // 默认为0
+            }
+            return UserDefaults.standard.integer(forKey: "wiki.qaq.iridium.compressionLevel")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "wiki.qaq.iridium.compressionLevel")
+            debugPrint("setting new compression level \(newValue)")
+        }
+    }
+
     static let shared = Agent()
     private init() {
         binaryLocation = nil
@@ -135,7 +149,7 @@ class Agent {
             .sorted { $0.localizedName < $1.localizedName }
     }
 
-    public func decryptApplication(with app: AppListElement, output: @escaping (String) -> Void) -> URL? {
+    public func decryptApplication(with app: AppListElement, minOSVersionOverride: String? = nil, output: @escaping (String) -> Void) -> URL? {
         #if DEBUG
             if Thread.isMainThread {
                 fatalError(
@@ -208,6 +222,55 @@ class Agent {
             output(recipe.stdout)
             output(recipe.stderr)
         } while false
+
+        // =====================================================================
+        if let targetVersion = minOSVersionOverride {
+            output("\n[*] Decrypt Prep: Patching MinimumOSVersion to \(targetVersion)...\n")
+            let infoPlistURL = processBundleLocation.appendingPathComponent("Info.plist")
+            
+            do {
+                // 1. 读取原始 Plist 数据 (由于 App 文件可读，即使 Owner 是 Root 也能读)
+                let plistData = try Data(contentsOf: infoPlistURL)
+                var format: PropertyListSerialization.PropertyListFormat = .binary
+                
+                // 2. 转换为 Dictionary
+                if var plistDict = try PropertyListSerialization.propertyList(from: plistData, options: .mutableContainersAndLeaves, format: &format) as? [String: Any] {
+                    
+                    // 3. 修改目标版本值
+                    plistDict["MinimumOSVersion"] = targetVersion
+                    
+                    // 4. 重新序列化为原有格式（通常是 iOS 标准的二进制 Binary 格式）
+                    let newData = try PropertyListSerialization.data(fromPropertyList: plistDict, format: format, options: 0)
+                    
+                    // 5. 写入到当前 App 可写的沙盒临时文件中
+                    let tempPlistURL = documentsDirectory.appendingPathComponent("Temp_Info.plist")
+                    try newData.write(to: tempPlistURL)
+                    
+                    // 6. 借助 Agent (Root 权限) 删除旧文件，并将新文件拷贝进去
+                    let _ = AuxiliaryExecute.spawn(
+                        command: binaryLocation.path,
+                        args: ["delete", infoPlistURL.path],
+                        timeout: 60
+                    )
+                    
+                    let _ = AuxiliaryExecute.spawn(
+                        command: binaryLocation.path,
+                        args: ["copy", tempPlistURL.path, infoPlistURL.path],
+                        timeout: 60
+                    )
+                    
+                    // 7. 清理临时文件
+                    try? FileManager.default.removeItem(at: tempPlistURL)
+                    
+                    output("\n[*] MinimumOSVersion patched successfully to \(targetVersion).\n")
+                } else {
+                    output("\n[!] Plist format unsupported.\n")
+                }
+            } catch {
+                output("\n[!] Failed to patch Info.plist: \(error.localizedDescription)\n")
+            }
+        }
+        // =====================================================================
 
         // MARK: - STEP 2 - Enumerate entire app bundle to find all mach objects
 
@@ -353,7 +416,7 @@ class Agent {
             atPath: zipTarget.path,
             withContentsOfDirectory: zipContainer.path,
             keepParentDirectory: false,
-            compressionLevel: 0,
+            compressionLevel: Int32(zipCompressionLevel), // [修改] 应用设置里的压缩等级
             password: nil,
             aes: false
         ) { entryNumber, total in
