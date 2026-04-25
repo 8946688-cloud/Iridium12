@@ -65,6 +65,17 @@ class Agent {
         }
     }
 
+    // [新增] 扩容签名区持久化存储，默认为 false
+    var expandSignature: Bool {
+        get {
+            return UserDefaults.standard.bool(forKey: "wiki.qaq.iridium.expandSignature")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "wiki.qaq.iridium.expandSignature")
+            debugPrint("setting expand signature to \(newValue)")
+        }
+    }
+
     static let shared = Agent()
     private init() {
         binaryLocation = nil
@@ -346,6 +357,56 @@ class Agent {
                 output(recipe.stderr)
             }
         }
+
+        // =====================================================================
+        // [新增] MARK: - STEP 3.2 - 扩容签名空间
+        if expandSignature {
+            output("\n\n[*] Expanding signature space for old devices...\n")
+            
+            // 自动寻找 ldid 的路径 (包括 TrollStore 和常见越狱目录)
+            var ldidPath = ""
+            var searchPaths = [
+                "/var/jb/usr/bin/ldid",
+                "/usr/bin/ldid",
+                "/usr/local/bin/ldid"
+            ]
+            
+            if let apps = try? FileManager.default.contentsOfDirectory(atPath: "/var/containers/Bundle/Application") {
+                for app in apps {
+                    let tsPath = "/var/containers/Bundle/Application/\(app)/TrollStore.app/ldid"
+                    if FileManager.default.fileExists(atPath: tsPath) {
+                        searchPaths.append(tsPath)
+                        break
+                    }
+                }
+            }
+            
+            for path in searchPaths {
+                if FileManager.default.fileExists(atPath: path) {
+                    ldidPath = path
+                    break
+                }
+            }
+            
+            if ldidPath.isEmpty {
+                output("[!] ldid not found! Cannot expand signature space.\n")
+            } else {
+                for (_, destBinary) in binaries {
+                    output("[*] Resigning to expand signature: \(destBinary.lastPathComponent)\n")
+                    let recipe = AuxiliaryExecute.spawn(
+                        command: binaryLocation.path,
+                        args: ["exec", ldidPath, "-s", destBinary.path],
+                        timeout: 120
+                    )
+                    if recipe.exitCode != 0 {
+                        output("[!] Failed:\n\(recipe.stderr)\n")
+                    } else {
+                        output("    Success.\n")
+                    }
+                }
+            }
+        }
+        // =====================================================================
 
         // MARK: - STEP 3.5 - Fail if ever recipe none 0 but ask for that
 
