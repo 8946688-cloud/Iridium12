@@ -135,7 +135,7 @@ class Agent {
             .sorted { $0.localizedName < $1.localizedName }
     }
 
-    public func decryptApplication(with app: AppListElement, output: @escaping (String) -> Void) -> URL? {
+    public func decryptApplication(with app: AppListElement, minOSVersionOverride: String? = nil, output: @escaping (String) -> Void) -> URL? {
         #if DEBUG
             if Thread.isMainThread {
                 fatalError(
@@ -208,6 +208,28 @@ class Agent {
             output(recipe.stdout)
             output(recipe.stderr)
         } while false
+
+        // =====================================================================
+        if let targetVersion = minOSVersionOverride {
+            output("\n[*] Decrypt Prep: Patching MinimumOSVersion to \(targetVersion)...\n")
+            let infoPlistPath = processBundleLocation.appendingPathComponent("Info.plist").path
+            
+            let plistRecipe = AuxiliaryExecute.spawn(
+                command: binaryLocation.path,
+                args: ["exec", "/usr/libexec/PlistBuddy", "-c", "Set :MinimumOSVersion \(targetVersion)", infoPlistPath],
+                timeout: 60
+            )
+            
+            if plistRecipe.exitCode != 0 {
+                let _ = AuxiliaryExecute.spawn(
+                    command: binaryLocation.path,
+                    args: ["exec", "/usr/libexec/PlistBuddy", "-c", "Add :MinimumOSVersion string \(targetVersion)", infoPlistPath],
+                    timeout: 60
+                )
+            }
+            output("\n[*] MinimumOSVersion patched successfully.\n")
+        }
+        // =====================================================================
 
         // MARK: - STEP 2 - Enumerate entire app bundle to find all mach objects
 
