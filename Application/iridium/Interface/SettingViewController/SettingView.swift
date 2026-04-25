@@ -93,6 +93,17 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             view.addTarget(self, action: #selector(selectBackend), for: .touchUpInside)
         case 5:
             let view = makeLeftAligButton()
+            view.setTitle("Select Compression Level", for: .normal)
+            cell.contentView.addSubview(view)
+            view.snp.makeConstraints { x in
+                x.left.equalToSuperview().offset(padding)
+                x.top.equalToSuperview()
+                x.bottom.equalToSuperview()
+                x.width.equalTo(250)
+            }
+            view.addTarget(self, action: #selector(selectCompressionLevel), for: .touchUpInside)
+        case 6:
+            let view = makeLeftAligButton()
             view.setTitle("Clear Documents", for: .normal)
             cell.contentView.addSubview(view)
             view.snp.makeConstraints { x in
@@ -102,7 +113,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(clearDocuments), for: .touchUpInside)
-        case 6:
+        case 7:
             let view = makeTintTextView()
             view.text = """
             Iridium is powered by FoulDecrypt.
@@ -121,7 +132,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                         right: CGFloat(padding)
                     ))
             }
-        case 7:
+        case 8:
             let view = makeLeftAligButton()
             view.setTitle("Get Source: [Iridium]", for: .normal)
             cell.contentView.addSubview(view)
@@ -132,7 +143,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(openSourceIridium), for: .touchUpInside)
-        case 8:
+        case 9:
             let view = makeLeftAligButton()
             view.setTitle("Get Source: [FoulDecrypt]", for: .normal)
             cell.contentView.addSubview(view)
@@ -143,7 +154,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(openSourceFoul), for: .touchUpInside)
-        case 9:
+        case 10:
             let view = makeTintTextView()
             view.text = """
             Copyright © 2022 Lakr Aream All Rights Reserved
@@ -158,7 +169,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                         right: CGFloat(padding)
                     ))
             }
-        case 10:
+        case 11:
             let view = makeLeftAligButton()
             view.setTitle("Twitter: @Lakr233", for: .normal)
             cell.contentView.addSubview(view)
@@ -203,15 +214,15 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             return 40
         case 2:
             return 30
-        case 3, 4, 5: // button
+        case 3, 4, 5, 6: // button
             return 25
-        case 6: // text
+        case 7: // text
             return 115
-        case 7, 8: // button
+        case 8, 9: // button
             return 25
-        case 9:
-            return 30
         case 10:
+            return 30
+        case 11:
             return 25
         default:
             return 0
@@ -268,6 +279,37 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
 
     @objc func selectBackend(sender: UIButton) {
         let actions = buildActionList()
+        let dropDown = DropDown(anchorView: sender)
+        dropDown.dataSource = actions
+            .map(\.text)
+            .invisibleSpacePadding()
+        dropDown.selectionAction = { [self] (index: Int, _: String) in
+            guard index >= 0, index < actions.count else { return }
+            let action = actions[index]
+            action.action(self)
+        }
+        dropDown.show(onTopOf: view.window)
+    }
+
+    @objc func selectCompressionLevel(sender: UIButton) {
+        let currentLevel = Agent.shared.zipCompressionLevel
+        
+        let actions: [SelectAction] = [
+            .init(text: currentLevel == 0 ? "✓ None (Level 0)" : "None (Level 0)", action: { _ in
+                Agent.shared.zipCompressionLevel = 0
+            }),
+            .init(text: currentLevel == 1 ? "✓ Fastest (Level 1)" : "Fastest (Level 1)", action: { _ in
+                Agent.shared.zipCompressionLevel = 1
+            }),
+            .init(text: currentLevel == -1 ? "✓ Default (Level 6)" : "Default (Level 6)", action: { _ in
+                Agent.shared.zipCompressionLevel = -1
+            }),
+            .init(text: currentLevel == 9 ? "✓ Best (Level 9)" : "Best (Level 9)", action: { _ in
+                Agent.shared.zipCompressionLevel = 9
+            }),
+            .init(text: "Cancel", action: { _ in })
+        ]
+        
         let dropDown = DropDown(anchorView: sender)
         dropDown.dataSource = actions
             .map(\.text)
