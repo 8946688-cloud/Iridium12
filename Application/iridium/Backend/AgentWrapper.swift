@@ -210,25 +210,55 @@ class Agent {
         } while false
 
         // =====================================================================
+                // =====================================================================
         if let targetVersion = minOSVersionOverride {
             output("\n[*] Decrypt Prep: Patching MinimumOSVersion to \(targetVersion)...\n")
-            let infoPlistPath = processBundleLocation.appendingPathComponent("Info.plist").path
+            let infoPlistURL = processBundleLocation.appendingPathComponent("Info.plist")
             
-            let plistRecipe = AuxiliaryExecute.spawn(
-                command: binaryLocation.path,
-                args: ["exec", "/usr/libexec/PlistBuddy", "-c", "Set :MinimumOSVersion \(targetVersion)", infoPlistPath],
-                timeout: 60
-            )
-            
-            if plistRecipe.exitCode != 0 {
-                let _ = AuxiliaryExecute.spawn(
-                    command: binaryLocation.path,
-                    args: ["exec", "/usr/libexec/PlistBuddy", "-c", "Add :MinimumOSVersion string \(targetVersion)", infoPlistPath],
-                    timeout: 60
-                )
+            do {
+                // 1. 读取原始 Plist 数据 (由于 App 文件可读，即使 Owner 是 Root 也能读)
+                let plistData = try Data(contentsOf: infoPlistURL)
+                var format: PropertyListSerialization.PropertyListFormat = .binary
+                
+                // 2. 转换为 Dictionary
+                if var plistDict = try PropertyListSerialization.propertyList(from: plistData, options: .mutableContainersAndLeaves, format: &format) as? [String: Any] {
+                    
+                    // 3. 修改目标版本值
+                    plistDict["MinimumOSVersion"] = targetVersion
+                    
+                    // 4. 重新序列化为原有格式（通常是 iOS 标准的二进制 Binary 格式）
+                    let newData = try PropertyListSerialization.data(fromPropertyList: plistDict, format: format, options: 0)
+                    
+                    // 5. 写入到当前 App 可写的沙盒临时文件中
+                    let tempPlistURL = documentsDirectory.appendingPathComponent("Temp_Info.plist")
+                    try newData.write(to: tempPlistURL)
+                    
+                    // 6. 借助 Agent (Root 权限) 删除旧文件，并将新文件拷贝进去
+                    let _ = AuxiliaryExecute.spawn(
+                        command: binaryLocation.path,
+                        args: ["delete", infoPlistURL.path],
+                        timeout: 60
+                    )
+                    
+                    let _ = AuxiliaryExecute.spawn(
+                        command: binaryLocation.path,
+                        args: ["copy", tempPlistURL.path, infoPlistURL.path],
+                        timeout: 60
+                    )
+                    
+                    // 7. 清理临时文件
+                    try? FileManager.default.removeItem(at: tempPlistURL)
+                    
+                    output("\n[*] MinimumOSVersion patched successfully to \(targetVersion).\n")
+                } else {
+                    output("\n[!] Plist format unsupported.\n")
+                }
+            } catch {
+                output("\n[!] Failed to patch Info.plist: \(error.localizedDescription)\n")
             }
-            output("\n[*] MinimumOSVersion patched successfully.\n")
         }
+        // =====================================================================
+
         // =====================================================================
 
         // MARK: - STEP 2 - Enumerate entire app bundle to find all mach objects
