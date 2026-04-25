@@ -14,6 +14,7 @@ class DecrypterViewController: UIViewController {
     var app: AppListElement?
 
     var decryptResult: URL?
+    var minOSVersionOverride: String?
 
     let padding = 15
     let textView = UITextView()
@@ -111,7 +112,7 @@ class DecrypterViewController: UIViewController {
         dispatchOnce = true
         DispatchQueue.global().async {
             if let app = self.app {
-                self.decryptResult = Agent.shared.decryptApplication(with: app) { str in
+                self.decryptResult = Agent.shared.decryptApplication(with: app, minOSVersionOverride: self.minOSVersionOverride) { str in
                     self.appendLog(str: str)
                 }
             } else {
