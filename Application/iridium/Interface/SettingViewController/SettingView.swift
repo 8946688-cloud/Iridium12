@@ -399,24 +399,27 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
 
     @objc func setNamingRule(sender: UIButton) {
         let currentMode = Agent.shared.fileNamingMode
-        let alert = UIAlertController(title: "Naming Rule", message: "Choose naming style", preferredStyle: .actionSheet)
         
-        alert.addAction(UIAlertAction(title: currentMode == 0 ? "✓ Official Default" : "Official Default", style: .default) { _ in
-            Agent.shared.fileNamingMode = 0
-        })
+        let actions: [SelectAction] = [
+            .init(text: currentMode == 0 ? "✓ Official Default" : "Official Default", action: { _ in
+                Agent.shared.fileNamingMode = 0
+            }),
+            .init(text: currentMode == 1 ? "✓ Custom Template..." : "Custom Template...", action: { [weak self] _ in
+                self?.showTemplateInput()
+            }),
+            .init(text: "Cancel", action: { _ in })
+        ]
         
-        alert.addAction(UIAlertAction(title: currentMode == 1 ? "✓ Custom Template..." : "Custom Template...", style: .default) { [weak self] _ in
-            self?.showTemplateInput()
-        })
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = sender
-            popover.sourceRect = sender.bounds
+        let dropDown = DropDown(anchorView: sender)
+        dropDown.dataSource = actions
+            .map(\.text)
+            .invisibleSpacePadding()
+        dropDown.selectionAction = { [self] (index: Int, _: String) in
+            guard index >= 0, index < actions.count else { return }
+            let action = actions[index]
+            action.action(self)
         }
-        
-        self.present(alert, animated: true)
+        dropDown.show(onTopOf: view.window)
     }
 
     func showTemplateInput() {
