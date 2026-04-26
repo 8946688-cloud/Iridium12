@@ -399,13 +399,17 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
 
     @objc func setNamingRule(sender: UIButton) {
         let currentMode = Agent.shared.fileNamingMode
+        let activeIndex = UserDefaults.standard.integer(forKey: "wiki.qaq.iridium.activeCustomTemplateIndex")
         
         let actions: [SelectAction] = [
             .init(text: currentMode == 0 ? "✓ Official Default" : "Official Default", action: { _ in
                 Agent.shared.fileNamingMode = 0
             }),
-            .init(text: currentMode == 1 ? "✓ Custom Template..." : "Custom Template...", action: { [weak self] _ in
-                self?.showTemplateInput()
+            .init(text: (currentMode == 1 && activeIndex != 2) ? "✓ Custom Template 1" : "Custom Template 1", action: { [weak self] _ in
+                self?.showTemplateInput(index: 1)
+            }),
+            .init(text: (currentMode == 1 && activeIndex == 2) ? "✓ Custom Template 2" : "Custom Template 2", action: { [weak self] _ in
+                self?.showTemplateInput(index: 2)
             }),
             .init(text: "Cancel", action: { _ in })
         ]
@@ -422,15 +426,18 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
         dropDown.show(onTopOf: view.window)
     }
 
-    func showTemplateInput() {
+    func showTemplateInput(index: Int) {
         let alert = UIAlertController(
-            title: "Custom Template",
+            title: "Custom Template \(index)",
             message: "Tags: {Name}, {BundleID}, {ShortVersion}, {Version}",
             preferredStyle: .alert
         )
         
+        let key = "wiki.qaq.iridium.customTemplate\(index)"
+        let savedTemplate = UserDefaults.standard.string(forKey: key) ?? Agent.shared.namingTemplate
+        
         alert.addTextField { tf in
-            tf.text = Agent.shared.namingTemplate
+            tf.text = savedTemplate
             tf.placeholder = "{Name}.{BundleID}.({ShortVersion})"
             tf.clearButtonMode = .whileEditing
         }
@@ -438,6 +445,12 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Save", style: .default) { _ in
             if let text = alert.textFields?.first?.text, !text.isEmpty {
+                // 保存对应的模板历史
+                UserDefaults.standard.set(text, forKey: key)
+                // 标记当前激活的索引(1或2)
+                UserDefaults.standard.set(index, forKey: "wiki.qaq.iridium.activeCustomTemplateIndex")
+                
+                // 真正应用给 Agent 砸壳使用的变量
                 Agent.shared.namingTemplate = text
                 Agent.shared.fileNamingMode = 1
             }
