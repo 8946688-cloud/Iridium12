@@ -63,7 +63,7 @@ jobs:
           
           # 2. 拷贝 DEBIAN 控制目录并替换版本号
           cp -r Workflow/DEBIAN layout/
-          sed -i '' "s/@@VERSION@@/1.2.15/g" layout/DEBIAN/control
+          sed -i '' "s/@@VERSION@@/1.2.16/g" layout/DEBIAN/control
           
           # 3. 手动解压 fouldecrypt.zip 并强制注入到 app 中
           echo "Injecting fouldecrypt engines and dylibs..."
