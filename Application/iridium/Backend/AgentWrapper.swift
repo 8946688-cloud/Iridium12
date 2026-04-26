@@ -64,6 +64,24 @@ class Agent {
             debugPrint("setting new compression level \(newValue)")
         }
     }
+    
+    // [新增] 命名模式：0 = Default, 1 = Custom
+    var fileNamingMode: Int {
+        get { UserDefaults.standard.integer(forKey: "wiki.qaq.iridium.namingMode") }
+        set { UserDefaults.standard.set(newValue, forKey: "wiki.qaq.iridium.namingMode") }
+    }
+
+    // [新增] 自定义模板，默认模拟原版样式
+    var namingTemplate: String {
+        get { UserDefaults.standard.string(forKey: "wiki.qaq.iridium.namingTemplate") ?? "{Name}.{BundleID}.({ShortVersion})" }
+        set { UserDefaults.standard.set(newValue, forKey: "wiki.qaq.iridium.namingTemplate") }
+    }
+
+    // [新增] 输出后缀：0 = .ipa, 1 = .zip
+    var outputExtensionMode: Int {
+        get { UserDefaults.standard.integer(forKey: "wiki.qaq.iridium.extensionMode") }
+        set { UserDefaults.standard.set(newValue, forKey: "wiki.qaq.iridium.extensionMode") }
+    }
 
     static let shared = Agent()
     private init() {
@@ -383,8 +401,29 @@ class Agent {
         }
 
         // MARK: - STEP 4 - Create installer file
+        
+        // [修改] 动态生成文件名
+        let ext = Agent.shared.outputExtensionMode == 1 ? ".zip" : ".ipa"
+        var rawName = ""
+        
+        if Agent.shared.fileNamingMode == 1 {
+            // 自定义模式
+            rawName = Agent.shared.namingTemplate
+                .replacingOccurrences(of: "{Name}", with: app.localizedName)
+                .replacingOccurrences(of: "{BundleID}", with: app.bundleIdentifier)
+                .replacingOccurrences(of: "{ShortVersion}", with: app.shortVersion)
+                .replacingOccurrences(of: "{Version}", with: app.version)
+        } else {
+            // 默认模式
+            rawName = "\(app.localizedName).\(app.bundleIdentifier).(\(app.shortVersion))"
+        }
+        
+        // 确保后缀正确
+        if !rawName.lowercased().hasSuffix(ext) {
+            rawName += ext
+        }
+        let fileName = rawName
 
-        let fileName = "\(app.localizedName).\(app.bundleIdentifier).(\(app.shortVersion)).ipa"
         var invalidCharacters = CharacterSet(charactersIn: ":/")
         invalidCharacters.formUnion(.newlines)
         invalidCharacters.formUnion(.illegalCharacters)
