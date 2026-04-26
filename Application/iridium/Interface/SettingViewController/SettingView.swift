@@ -29,7 +29,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
     }
 
     func tableView(_: UITableView, numberOfRowsInSection _: Int) -> Int {
-        20
+        22 // [修改] 增加行数以容纳新按钮
     }
 
     func tableView(_: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -102,7 +102,35 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(selectCompressionLevel), for: .touchUpInside)
+            
+        // [新增] 修改输出后缀按钮
         case 6:
+            let view = makeLeftAligButton()
+            view.setTitle("Set Output Extension", for: .normal)
+            cell.contentView.addSubview(view)
+            view.snp.makeConstraints { x in
+                x.left.equalToSuperview().offset(padding)
+                x.top.equalToSuperview()
+                x.bottom.equalToSuperview()
+                x.width.equalTo(250)
+            }
+            view.addTarget(self, action: #selector(selectOutputExtension), for: .touchUpInside)
+            
+        // [新增] 自定义命名规则按钮
+        case 7:
+            let view = makeLeftAligButton()
+            view.setTitle("Set IPA Naming Template", for: .normal)
+            cell.contentView.addSubview(view)
+            view.snp.makeConstraints { x in
+                x.left.equalToSuperview().offset(padding)
+                x.top.equalToSuperview()
+                x.bottom.equalToSuperview()
+                x.width.equalTo(250)
+            }
+            view.addTarget(self, action: #selector(setNamingRule), for: .touchUpInside)
+
+        // 原有内容顺序延后
+        case 8:
             let view = makeLeftAligButton()
             view.setTitle("Clear Documents", for: .normal)
             cell.contentView.addSubview(view)
@@ -113,7 +141,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(clearDocuments), for: .touchUpInside)
-        case 7:
+        case 9:
             let view = makeTintTextView()
             view.text = """
             Iridium is powered by FoulDecrypt.
@@ -132,7 +160,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                         right: CGFloat(padding)
                     ))
             }
-        case 8:
+        case 10:
             let view = makeLeftAligButton()
             view.setTitle("Get Source: [Iridium]", for: .normal)
             cell.contentView.addSubview(view)
@@ -143,7 +171,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(openSourceIridium), for: .touchUpInside)
-        case 9:
+        case 11:
             let view = makeLeftAligButton()
             view.setTitle("Get Source: [FoulDecrypt]", for: .normal)
             cell.contentView.addSubview(view)
@@ -154,7 +182,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(openSourceFoul), for: .touchUpInside)
-        case 10:
+        case 12:
             let view = makeTintTextView()
             view.text = """
             Copyright © 2022 Lakr Aream All Rights Reserved
@@ -169,7 +197,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                         right: CGFloat(padding)
                     ))
             }
-        case 11:
+        case 13:
             let view = makeLeftAligButton()
             view.setTitle("Twitter: @Lakr233", for: .normal)
             cell.contentView.addSubview(view)
@@ -214,15 +242,15 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             return 40
         case 2:
             return 30
-        case 3, 4, 5, 6: // button
+        case 3, 4, 5, 6, 7, 8: // [修改] button (增加新按钮行高)
             return 25
-        case 7: // text
+        case 9: // text (顺延)
             return 115
-        case 8, 9: // button
+        case 10, 11: // button (顺延)
             return 25
-        case 10:
+        case 12: // copyright (顺延)
             return 30
-        case 11:
+        case 13: // twitter (顺延)
             return 25
         default:
             return 0
@@ -340,5 +368,78 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             action.action(self)
         }
         dropDown.show(onTopOf: view.window)
+    }
+
+    // MARK: - [新增] 新增功能的动作方法
+
+    @objc func selectOutputExtension(sender: UIButton) {
+        let currentExt = Agent.shared.outputExtensionMode
+        
+        let actions: [SelectAction] = [
+            .init(text: currentExt == 0 ? "✓ .ipa (Default)" : ".ipa", action: { _ in
+                Agent.shared.outputExtensionMode = 0
+            }),
+            .init(text: currentExt == 1 ? "✓ .zip" : ".zip", action: { _ in
+                Agent.shared.outputExtensionMode = 1
+            }),
+            .init(text: "Cancel", action: { _ in })
+        ]
+        
+        let dropDown = DropDown(anchorView: sender)
+        dropDown.dataSource = actions
+            .map(\.text)
+            .invisibleSpacePadding()
+        dropDown.selectionAction = { [self] (index: Int, _: String) in
+            guard index >= 0, index < actions.count else { return }
+            let action = actions[index]
+            action.action(self)
+        }
+        dropDown.show(onTopOf: view.window)
+    }
+
+    @objc func setNamingRule(sender: UIButton) {
+        let currentMode = Agent.shared.fileNamingMode
+        let alert = UIAlertController(title: "Naming Rule", message: "Choose naming style", preferredStyle: .actionSheet)
+        
+        alert.addAction(UIAlertAction(title: currentMode == 0 ? "✓ Official Default" : "Official Default", style: .default) { _ in
+            Agent.shared.fileNamingMode = 0
+        })
+        
+        alert.addAction(UIAlertAction(title: currentMode == 1 ? "✓ Custom Template..." : "Custom Template...", style: .default) { [weak self] _ in
+            self?.showTemplateInput()
+        })
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = sender
+            popover.sourceRect = sender.bounds
+        }
+        
+        self.present(alert, animated: true)
+    }
+
+    func showTemplateInput() {
+        let alert = UIAlertController(
+            title: "Custom Template",
+            message: "Tags: {Name}, {BundleID}, {ShortVersion}, {Version}",
+            preferredStyle: .alert
+        )
+        
+        alert.addTextField { tf in
+            tf.text = Agent.shared.namingTemplate
+            tf.placeholder = "{Name}.{BundleID}.({ShortVersion})"
+            tf.clearButtonMode = .whileEditing
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Save", style: .default) { _ in
+            if let text = alert.textFields?.first?.text, !text.isEmpty {
+                Agent.shared.namingTemplate = text
+                Agent.shared.fileNamingMode = 1
+            }
+        })
+        
+        self.present(alert, animated: true)
     }
 }
