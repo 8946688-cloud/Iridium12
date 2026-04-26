@@ -29,7 +29,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
     }
 
     func tableView(_: UITableView, numberOfRowsInSection _: Int) -> Int {
-        20
+        22 // [修改] 增加行数以容纳新按钮
     }
 
     func tableView(_: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -93,6 +93,45 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             view.addTarget(self, action: #selector(selectBackend), for: .touchUpInside)
         case 5:
             let view = makeLeftAligButton()
+            view.setTitle("Select Compression Level", for: .normal)
+            cell.contentView.addSubview(view)
+            view.snp.makeConstraints { x in
+                x.left.equalToSuperview().offset(padding)
+                x.top.equalToSuperview()
+                x.bottom.equalToSuperview()
+                x.width.equalTo(250)
+            }
+            view.addTarget(self, action: #selector(selectCompressionLevel), for: .touchUpInside)
+            
+        // [新增] 修改输出后缀按钮
+        case 6:
+            let view = makeLeftAligButton()
+            view.setTitle("Set Output Extension", for: .normal)
+            cell.contentView.addSubview(view)
+            view.snp.makeConstraints { x in
+                x.left.equalToSuperview().offset(padding)
+                x.top.equalToSuperview()
+                x.bottom.equalToSuperview()
+                x.width.equalTo(250)
+            }
+            view.addTarget(self, action: #selector(selectOutputExtension), for: .touchUpInside)
+            
+        // [新增] 自定义命名规则按钮
+        case 7:
+            let view = makeLeftAligButton()
+            view.setTitle("Set IPA Naming Template", for: .normal)
+            cell.contentView.addSubview(view)
+            view.snp.makeConstraints { x in
+                x.left.equalToSuperview().offset(padding)
+                x.top.equalToSuperview()
+                x.bottom.equalToSuperview()
+                x.width.equalTo(250)
+            }
+            view.addTarget(self, action: #selector(setNamingRule), for: .touchUpInside)
+
+        // 原有内容顺序延后
+        case 8:
+            let view = makeLeftAligButton()
             view.setTitle("Clear Documents", for: .normal)
             cell.contentView.addSubview(view)
             view.snp.makeConstraints { x in
@@ -102,7 +141,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(clearDocuments), for: .touchUpInside)
-        case 6:
+        case 9:
             let view = makeTintTextView()
             view.text = """
             Iridium is powered by FoulDecrypt.
@@ -121,7 +160,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                         right: CGFloat(padding)
                     ))
             }
-        case 7:
+        case 10:
             let view = makeLeftAligButton()
             view.setTitle("Get Source: [Iridium]", for: .normal)
             cell.contentView.addSubview(view)
@@ -132,7 +171,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(openSourceIridium), for: .touchUpInside)
-        case 8:
+        case 11:
             let view = makeLeftAligButton()
             view.setTitle("Get Source: [FoulDecrypt]", for: .normal)
             cell.contentView.addSubview(view)
@@ -143,7 +182,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                 x.width.equalTo(250)
             }
             view.addTarget(self, action: #selector(openSourceFoul), for: .touchUpInside)
-        case 9:
+        case 12:
             let view = makeTintTextView()
             view.text = """
             Copyright © 2022 Lakr Aream All Rights Reserved
@@ -158,7 +197,7 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                         right: CGFloat(padding)
                     ))
             }
-        case 10:
+        case 13:
             let view = makeLeftAligButton()
             view.setTitle("Twitter: @Lakr233", for: .normal)
             cell.contentView.addSubview(view)
@@ -203,15 +242,15 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             return 40
         case 2:
             return 30
-        case 3, 4, 5: // button
+        case 3, 4, 5, 6, 7, 8: // [修改] button (增加新按钮行高)
             return 25
-        case 6: // text
+        case 9: // text (顺延)
             return 115
-        case 7, 8: // button
+        case 10, 11: // button (顺延)
             return 25
-        case 9:
+        case 12: // copyright (顺延)
             return 30
-        case 10:
+        case 13: // twitter (顺延)
             return 25
         default:
             return 0
@@ -249,17 +288,18 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
     }
 
     func buildActionList() -> [SelectAction] {
-        [
-            .init(text: "Auto Switch", action: { _ in
+        let currentOption = Agent.shared.foulOption
+        return [
+            .init(text: currentOption == .unspecified ? "✓ Auto Switch" : "Auto Switch", action: { _ in
                 Agent.shared.foulOption = .unspecified
             }),
-            .init(text: "TFP0", action: { _ in
+            .init(text: currentOption == .tfp0 ? "✓ TFP0" : "TFP0", action: { _ in
                 Agent.shared.foulOption = .tfp0
             }),
-            .init(text: "KRW - uncover", action: { _ in
+            .init(text: currentOption == .krw ? "✓ KRW - uncover" : "KRW - uncover", action: { _ in
                 Agent.shared.foulOption = .krw
             }),
-            .init(text: "KERNRW - taurine", action: { _ in
+            .init(text: currentOption == .kernrw ? "✓ KERNRW - taurine" : "KERNRW - taurine", action: { _ in
                 Agent.shared.foulOption = .kernrw
             }),
             .init(text: "Cancel", action: { _ in }),
@@ -268,6 +308,37 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
 
     @objc func selectBackend(sender: UIButton) {
         let actions = buildActionList()
+        let dropDown = DropDown(anchorView: sender)
+        dropDown.dataSource = actions
+            .map(\.text)
+            .invisibleSpacePadding()
+        dropDown.selectionAction = { [self] (index: Int, _: String) in
+            guard index >= 0, index < actions.count else { return }
+            let action = actions[index]
+            action.action(self)
+        }
+        dropDown.show(onTopOf: view.window)
+    }
+
+    @objc func selectCompressionLevel(sender: UIButton) {
+        let currentLevel = Agent.shared.zipCompressionLevel
+        
+        let actions: [SelectAction] = [
+            .init(text: currentLevel == 0 ? "✓ None (Level 0)" : "None (Level 0)", action: { _ in
+                Agent.shared.zipCompressionLevel = 0
+            }),
+            .init(text: currentLevel == 1 ? "✓ Fastest (Level 1)" : "Fastest (Level 1)", action: { _ in
+                Agent.shared.zipCompressionLevel = 1
+            }),
+            .init(text: currentLevel == -1 ? "✓ Default (Level 6)" : "Default (Level 6)", action: { _ in
+                Agent.shared.zipCompressionLevel = -1
+            }),
+            .init(text: currentLevel == 9 ? "✓ Best (Level 9)" : "Best (Level 9)", action: { _ in
+                Agent.shared.zipCompressionLevel = 9
+            }),
+            .init(text: "Cancel", action: { _ in })
+        ]
+        
         let dropDown = DropDown(anchorView: sender)
         dropDown.dataSource = actions
             .map(\.text)
@@ -297,5 +368,94 @@ class SettingView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             action.action(self)
         }
         dropDown.show(onTopOf: view.window)
+    }
+
+    // MARK: - [新增] 新增功能的动作方法
+
+    @objc func selectOutputExtension(sender: UIButton) {
+        let currentExt = Agent.shared.outputExtensionMode
+        
+        let actions: [SelectAction] = [
+            .init(text: currentExt == 0 ? "✓ .ipa (Default)" : ".ipa", action: { _ in
+                Agent.shared.outputExtensionMode = 0
+            }),
+            .init(text: currentExt == 1 ? "✓ .zip" : ".zip", action: { _ in
+                Agent.shared.outputExtensionMode = 1
+            }),
+            .init(text: "Cancel", action: { _ in })
+        ]
+        
+        let dropDown = DropDown(anchorView: sender)
+        dropDown.dataSource = actions
+            .map(\.text)
+            .invisibleSpacePadding()
+        dropDown.selectionAction = { [self] (index: Int, _: String) in
+            guard index >= 0, index < actions.count else { return }
+            let action = actions[index]
+            action.action(self)
+        }
+        dropDown.show(onTopOf: view.window)
+    }
+
+    @objc func setNamingRule(sender: UIButton) {
+        let currentMode = Agent.shared.fileNamingMode
+        let activeIndex = UserDefaults.standard.integer(forKey: "wiki.qaq.iridium.activeCustomTemplateIndex")
+        
+        let actions: [SelectAction] = [
+            .init(text: currentMode == 0 ? "✓ Official Default" : "Official Default", action: { _ in
+                Agent.shared.fileNamingMode = 0
+            }),
+            .init(text: (currentMode == 1 && activeIndex != 2) ? "✓ Custom Template 1" : "Custom Template 1", action: { [weak self] _ in
+                self?.showTemplateInput(index: 1)
+            }),
+            .init(text: (currentMode == 1 && activeIndex == 2) ? "✓ Custom Template 2" : "Custom Template 2", action: { [weak self] _ in
+                self?.showTemplateInput(index: 2)
+            }),
+            .init(text: "Cancel", action: { _ in })
+        ]
+        
+        let dropDown = DropDown(anchorView: sender)
+        dropDown.dataSource = actions
+            .map(\.text)
+            .invisibleSpacePadding()
+        dropDown.selectionAction = { [self] (index: Int, _: String) in
+            guard index >= 0, index < actions.count else { return }
+            let action = actions[index]
+            action.action(self)
+        }
+        dropDown.show(onTopOf: view.window)
+    }
+
+    func showTemplateInput(index: Int) {
+        let alert = UIAlertController(
+            title: "Custom Template \(index)",
+            message: "Tags: {Name}, {BundleID}, {ShortVersion}, {Version}",
+            preferredStyle: .alert
+        )
+        
+        let key = "wiki.qaq.iridium.customTemplate\(index)"
+        let savedTemplate = UserDefaults.standard.string(forKey: key) ?? Agent.shared.namingTemplate
+        
+        alert.addTextField { tf in
+            tf.text = savedTemplate
+            tf.placeholder = "{Name}.{BundleID}.({ShortVersion})"
+            tf.clearButtonMode = .whileEditing
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Save", style: .default) { _ in
+            if let text = alert.textFields?.first?.text, !text.isEmpty {
+                // 保存对应的模板历史
+                UserDefaults.standard.set(text, forKey: key)
+                // 标记当前激活的索引(1或2)
+                UserDefaults.standard.set(index, forKey: "wiki.qaq.iridium.activeCustomTemplateIndex")
+                
+                // 真正应用给 Agent 砸壳使用的变量
+                Agent.shared.namingTemplate = text
+                Agent.shared.fileNamingMode = 1
+            }
+        })
+        
+        self.present(alert, animated: true)
     }
 }
